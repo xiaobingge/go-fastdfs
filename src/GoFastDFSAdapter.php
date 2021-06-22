@@ -22,6 +22,12 @@ class GoFastDFSAdapter extends AbstractAdapter
     /** @var string  */
     private $group;
 
+    /** @var string  */
+    private $scene;
+
+    /** @var string  */
+    private $baseUrl;
+
     /**
      * FastDFSAdapter constructor.
      * @throws \Exception
@@ -29,6 +35,12 @@ class GoFastDFSAdapter extends AbstractAdapter
     public function __construct($config = [])
     {
         $this->domain = $config['domain'];
+
+        $this->group = $config['group'];
+
+        $this->scene = $config['scene'];
+
+        $this->baseUrl = $config['domain']."/".$config['group'];
     }
 
     public function createDir($dirname, Config $config)
@@ -58,6 +70,16 @@ class GoFastDFSAdapter extends AbstractAdapter
     public function delete($path)
     {
         // TODO: Implement delete() method.
+        try{
+            $client = new \GuzzleHttp\Client(['timeout' =>10]);
+            $result = $client->get($this->baseUrl."/delete", ['query' => ['path'=>$path]]);
+            if (200 == $result->getStatusCode() && $result = json_decode($result->getBody(), true)) {
+                return true;
+            }
+        }catch (\Exception $e){
+            return false;
+        }
+        return false;
     }
 
     public function deleteDir($dirname)
@@ -83,6 +105,16 @@ class GoFastDFSAdapter extends AbstractAdapter
     public function getSize($path)
     {
         // TODO: Implement getSize() method.
+        try{
+            $client = new \GuzzleHttp\Client(['timeout' =>10]);
+            $result = $client->get($this->baseUrl."/get_file_info", ['query' => ['path'=>$path]]);
+            if (200 == $result->getStatusCode() && $result = json_decode($result->getBody(), true)) {
+                return $result['data'];
+            }
+        }catch (\Exception $e){
+            return false;
+        }
+        return false;
     }
 
     public function getPathPrefix()
@@ -118,7 +150,7 @@ class GoFastDFSAdapter extends AbstractAdapter
      *
      * @return array|bool|null
      */
-    public function has($path): array
+    public function has($path)
     {
         // TODO: Implement has() method.
     }
@@ -133,7 +165,7 @@ class GoFastDFSAdapter extends AbstractAdapter
      */
     public function read($path)
     {
-        $url = $this->domain.'/'.$path;
+        $url = $this->baseUrl.'/'.$path;
         return ['contents' => file_get_contents($url)];
     }
 
@@ -147,7 +179,10 @@ class GoFastDFSAdapter extends AbstractAdapter
      */
     public function readStream($path)
     {
-
+        $resource = $this->baseUrl.'/'.$path;
+        return [
+            'stream' => $resource = fopen($resource, 'r')
+        ];
     }
 
     /**
@@ -159,17 +194,20 @@ class GoFastDFSAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        $url = $this->domain."/group1/upload";
-        $client = new \GuzzleHttp\Client(['timeout' => 30]);
-        $options = [
-            ['name' => 'file', 'contents' => $contents, 'filename' => basename($path)],
-            ['name' => 'output', 'contents' => 'json'],
-            ['name' => 'path', 'contents' => dirname($path)],
-            ['name' => 'scene', 'contents' => '']
-        ];
-        $result = $client->post($url, ['multipart' => $options]);
-        if (200 == $result->getStatusCode() && $result = json_decode($result->getBody(), true)) {
-            return true;
+        try{
+            $client = new \GuzzleHttp\Client(['timeout' => 300]);
+            $options = [
+                ['name' => 'file', 'contents' => $contents, 'filename' => basename($path)],
+                ['name' => 'output', 'contents' => 'json'],
+                ['name' => 'path', 'contents' => dirname($path)],
+                ['name' => 'scene', 'contents' => $this->scene]
+            ];
+            $result = $client->post($this->baseUrl."/upload", ['multipart' => $options]);
+            if (200 == $result->getStatusCode() && $result = json_decode($result->getBody(), true)) {
+                return true;
+            }
+        }catch (\Exception $e){
+            return false;
         }
         return false;
     }
@@ -186,15 +224,14 @@ class GoFastDFSAdapter extends AbstractAdapter
     public function writeStream($path, $resource, Config $config)
     {
         try{
-            $url = $this->domain."/group1/upload";
-            $client = new \GuzzleHttp\Client(['timeout' => 30]);
+            $client = new \GuzzleHttp\Client(['timeout' => 300]);
             $options = [
-                ['name' => 'file', 'contents' => $resource, 'filename' => $config['file_name']],
+                ['name' => 'file', 'contents' => $resource, 'filename' => basename($path)],
                 ['name' => 'output', 'contents' => 'json'],
-                ['name' => 'path', 'contents' => $path],
-                ['name' => 'scene', 'contents' => 'upload']
+                ['name' => 'path', 'contents' => dirname($path)],
+                ['name' => 'scene', 'contents' => $this->scene]
             ];
-            $result = $client->post($url, ['multipart' => $options]);
+            $result = $client->post($this->baseUrl."/upload", ['multipart' => $options]);
             if (200 == $result->getStatusCode() && $result = json_decode($result->getBody(), true)) {
                 return $result;
             }
