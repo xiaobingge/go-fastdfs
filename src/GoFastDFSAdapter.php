@@ -40,7 +40,7 @@ class GoFastDFSAdapter extends AbstractAdapter
 
         $this->scene = $config['scene'];
 
-        $this->baseUrl = $config['domain']."/".$config['group'];
+        $this->baseUrl = $config['domain'];
     }
 
     public function createDir($dirname, Config $config)
